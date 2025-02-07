@@ -15,21 +15,6 @@
             "resources/*.png"
         ]
     },
-    "settings": {
-        "enable-rank": {
-            "name": "Enable Demon Ranking Text",
-            "description": "Whether or not to display the demon ranking text.",
-            "type": "bool",
-            "default": true
-        },
-        "white-rank": {
-            "name": "White Demon Ranking Text",
-            "description": "Whether or not to display the demon ranking text in white.",
-            "type": "bool",
-            "enable-if": "enable-rank",
-            "default": false
-        }
-    },
     "dependencies": [
         {
             "id": "geode.node-ids",

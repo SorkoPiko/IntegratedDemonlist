@@ -10,8 +10,7 @@ project(IntegratedTSL VERSION 1.7.3)
 add_library(${PROJECT_NAME} SHARED
     src/classes/IDListLayer.cpp
     src/classes/IDPackCell.cpp
-        src/hooks/LevelCell.cpp
-    src/hooks/LevelSearchLayer.cpp
+        src/hooks/LevelSearchLayer.cpp
     src/IntegratedDemonlist.cpp
 )
 
