@@ -8,7 +8,11 @@ class $modify(IDLevelSearchLayer, LevelSearchLayer) {
     bool init(int searchType) {
         if (!LevelSearchLayer::init(searchType)) return false;
 
-        auto demonlistButtonSprite = CircleButtonSprite::createWithSprite("ID_demonBtn_001.png"_spr);
+        auto demonlistButtonSprite = CircleButtonSprite::createWithSprite(
+            "ID_demonBtn_001.png"_spr,
+            1.f,
+            CircleBaseColor::Cyan
+        );
         demonlistButtonSprite->getTopNode()->setScale(1.0f);
         demonlistButtonSprite->setScale(0.8f);
         auto demonlistButton = CCMenuItemSpriteExtra::create(demonlistButtonSprite, this, menu_selector(IDLevelSearchLayer::onDemonlistLevels));

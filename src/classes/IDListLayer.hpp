@@ -7,11 +7,11 @@ class IDListLayer : public cocos2d::CCLayer, SetIDPopupDelegate, LevelManagerDel
 private:
     inline static bool PEMONLIST = false;
     inline static const char* AREDL_INFO =
-        "The <cg>All Rated Extreme Demons List</c> (<cg>AREDL</c>) is an <cp>unofficial ranking</c> of all rated <cj>classic mode</c> <cr>extreme demons</c> in Geometry Dash.\n"
-        "It is managed by <cy>Padahk</c> and <cy>ley</c>.";
+        "<cg>The Shitty List</c> (<cg>TSL</c>) is a <cp>ranking</c> of all easy remakes of <cj>classic mode</c> <cr>levels</c> in Geometry Dash.\n"
+        "It is managed by <cy>Prometheus</c>, <cy>SorryM8</c> and <cy>Wiktor</c>.";
     inline static const char* PEMONLIST_INFO =
-        "The <cg>Pemonlist</c> is an <cp>unofficial ranking</c> of the top 150 <cj>platformer mode</c> <cr>demons</c> in Geometry Dash.\n"
-        "It is managed by <cy>camila314</c>, <cy>Extatica</c>, <cy>IvanCrafter026</c>, <cy>Megu</c>, and <cy>Voiddle</c>.";
+        "<cg>The Shitty List+</c> (<cg>TSL+</c>) is a <cp>ranking</c> of all hard remakes of <cj>classic mode</c> <cr>levels</c> in Geometry Dash.\n"
+        "It is managed by <cy>Prometheus</c>, <cy>SorryM8</c> and <cy>Wiktor</c>.";
 public:
     static IDListLayer* create();
     static cocos2d::CCScene* scene();

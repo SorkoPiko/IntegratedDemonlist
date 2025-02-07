@@ -5,11 +5,11 @@
         "win": "2.2074",
         "mac": "2.2074"
     },
-    "version": "v1.7.3",
-    "id": "hiimjustin000.integrated_demonlist",
-    "name": "Integrated Demonlist",
-    "developer": "hiimjasmine00",
-    "description": "A mod that integrates aredl.net and pemonlist.com into Geometry Dash.",
+    "version": "v1.0.0",
+    "id": "sorkopiko.integrated_tsl",
+    "name": "Integrated TSL",
+    "developer": "SorkoPiko",
+    "description": "A mod that integrates the TSL into Geometry Dash.",
     "resources": {
         "sprites": [
             "resources/*.png"
@@ -30,13 +30,17 @@
             "default": false
         }
     },
-    "dependencies": {
-        "geode.node-ids": ">=v1.12.0"
-    },
+    "dependencies": [
+        {
+            "id": "geode.node-ids",
+            "version": ">=v1.19.0",
+            "importance": "required"
+
+        }
+    ],
     "links": {
-        "community": "https://discord.gg/QVKmbvBXA7",
-        "source": "https://github.com/hiimjasmine00/IntegratedDemonlist",
-        "homepage": "https://www.hiimjustin000.com"
+        "community": "https://discord.gg/8uPFxhxBX9",
+        "source": "https://github.com/SorkoPiko/IntegratedTSL"
     },
     "tags": [
         "content",

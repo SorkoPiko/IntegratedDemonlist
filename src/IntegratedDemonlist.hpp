@@ -14,26 +14,25 @@ struct IDDemonPack {
 };
 
 class IntegratedDemonlist {
+    static void load(const std::string& url,
+                     bool pemonlist,
+                     geode::EventListener<geode::Task<geode::utils::web::WebResponse, geode::utils::web::WebProgress>>&&
+                     listenerRef, geode::EventListener<geode::Task<geode::utils::web::WebResponse, geode::utils::web::WebProgress>>&&
+                     okListener, const std::function<void()>& success, const std::function<void(int)>& failure);
+
 public:
     inline static std::vector<IDListDemon> AREDL = {};
-    inline static std::vector<IDDemonPack> AREDL_PACKS = {};
     inline static std::vector<IDListDemon> PEMONLIST = {};
     inline static bool AREDL_LOADED = false;
     inline static bool PEMONLIST_LOADED = false;
 
-    static void loadAREDL(
+    static void loadTSL(
         geode::EventListener<geode::utils::web::WebTask>&&,
         geode::EventListener<geode::utils::web::WebTask>&&,
         const std::function<void()>&,
         const std::function<void(int)>&
     );
-    static void loadAREDLPacks(
-        geode::EventListener<geode::utils::web::WebTask>&&,
-        geode::EventListener<geode::utils::web::WebTask>&&,
-        const std::function<void()>&,
-        const std::function<void(int)>&
-    );
-    static void loadPemonlist(
+    static void loadTSLPlus(
         geode::EventListener<geode::utils::web::WebTask>&&,
         geode::EventListener<geode::utils::web::WebTask>&&,
         const std::function<void()>&,

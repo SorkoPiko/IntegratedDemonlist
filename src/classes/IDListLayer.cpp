@@ -65,7 +65,7 @@ bool IDListLayer::init() {
     addChild(m_countLabel);
 
     m_list = GJListLayer::create(CustomListView::create(CCArray::create(), BoomListType::Level, 190.0f, 356.0f),
-        PEMONLIST ? "Pemonlist" : "All Rated Extreme Demons List", { 0, 0, 0, 180 }, 356.0f, 220.0f, 0);
+        PEMONLIST ? "TSL+" : "TSL", { 0, 0, 0, 180 }, 356.0f, 220.0f, 0);
     m_list->setZOrder(2);
     m_list->setPosition(winSize / 2 - m_list->getContentSize() / 2);
     m_list->setID("GJListLayer");
@@ -97,7 +97,7 @@ bool IDListLayer::init() {
     m_rightButton->setID("next-page-button");
     menu->addChild(m_rightButton);
 
-    m_infoButton = InfoAlertButton::create(PEMONLIST ? "Pemonlist" : "All Rated Extreme Demons List", PEMONLIST ? PEMONLIST_INFO : AREDL_INFO, 1.0f);
+    m_infoButton = InfoAlertButton::create(PEMONLIST ? "TSL+" : "TSL", PEMONLIST ? PEMONLIST_INFO : AREDL_INFO, 1.0f);
     m_infoButton->setPosition({ 30.0f, 30.0f });
     m_infoButton->setID("info-button");
     menu->addChild(m_infoButton, 2);
@@ -105,9 +105,9 @@ bool IDListLayer::init() {
     auto refreshBtnSpr = CCSprite::createWithSpriteFrameName("GJ_updateBtn_001.png");
     auto refreshButton = CCMenuItemExt::createSpriteExtra(refreshBtnSpr, [this](auto) {
         showLoading();
-        if (PEMONLIST) IntegratedDemonlist::loadPemonlist(std::move(m_pemonlistListener), std::move(m_pemonlistOkListener),
+        if (PEMONLIST) IntegratedDemonlist::loadTSLPlus(std::move(m_pemonlistListener), std::move(m_pemonlistOkListener),
             [this] { populateList(m_query); }, failure(true));
-        else IntegratedDemonlist::loadAREDL(std::move(m_aredlListener), std::move(m_aredlOkListener),
+        else IntegratedDemonlist::loadTSL(std::move(m_aredlListener), std::move(m_aredlOkListener),
             [this] { populateList(m_query); }, failure(false));
     });
     refreshButton->setPosition({ winSize.width - refreshBtnSpr->getContentWidth() / 2 - 4.0f, refreshBtnSpr->getContentHeight() / 2 + 4.0f });
@@ -121,14 +121,14 @@ bool IDListLayer::init() {
         m_moonToggle->setColor({ 125, 125, 125 });
         showLoading();
         if (auto listTitle = static_cast<CCLabelBMFont*>(m_list->getChildByID("title"))) {
-            listTitle->setString("All Rated Extreme Demons List");
+            listTitle->setString("TSL");
             listTitle->limitLabelWidth(280.0f, 0.8f, 0.0f);
         }
-        m_infoButton->m_title = "All Rated Extreme Demons List";
+        m_infoButton->m_title = "TSL";
         m_infoButton->m_description = AREDL_INFO;
         m_fullSearchResults.clear();
         if (IntegratedDemonlist::AREDL_LOADED) page(0);
-        else IntegratedDemonlist::loadAREDL(std::move(m_aredlListener), std::move(m_aredlOkListener),
+        else IntegratedDemonlist::loadTSL(std::move(m_aredlListener), std::move(m_aredlOkListener),
             [this] { page(0); }, failure(false));
     });
     m_starToggle->setPosition({ 30.0f, 60.0f });
@@ -143,14 +143,14 @@ bool IDListLayer::init() {
         m_moonToggle->setColor({ 255, 255, 255 });
         showLoading();
         if (auto listTitle = static_cast<CCLabelBMFont*>(m_list->getChildByID("title"))) {
-            listTitle->setString("Pemonlist");
+            listTitle->setString("TSL+");
             listTitle->limitLabelWidth(280.0f, 0.8f, 0.0f);
         }
-        m_infoButton->m_title = "Pemonlist";
+        m_infoButton->m_title = "TSL+";
         m_infoButton->m_description = PEMONLIST_INFO;
         m_fullSearchResults.clear();
         if (IntegratedDemonlist::PEMONLIST_LOADED) page(0);
-        else IntegratedDemonlist::loadPemonlist(std::move(m_pemonlistListener), std::move(m_pemonlistOkListener),
+        else IntegratedDemonlist::loadTSLPlus(std::move(m_pemonlistListener), std::move(m_pemonlistOkListener),
             [this] { page(0); }, failure(true));
     });
     m_moonToggle->setPosition({ 60.0f, 60.0f });
@@ -220,10 +220,10 @@ bool IDListLayer::init() {
 
     if (PEMONLIST) {
         if (IntegratedDemonlist::PEMONLIST_LOADED) populateList("");
-        else IntegratedDemonlist::loadPemonlist(std::move(m_pemonlistListener), std::move(m_pemonlistOkListener), [this] { populateList(""); }, failure(true));
+        else IntegratedDemonlist::loadTSLPlus(std::move(m_pemonlistListener), std::move(m_pemonlistOkListener), [this] { populateList(""); }, failure(true));
     }
     else if (IntegratedDemonlist::AREDL_LOADED) populateList("");
-    else IntegratedDemonlist::loadAREDL(std::move(m_aredlListener), std::move(m_aredlOkListener), [this] { populateList(""); }, failure(false));
+    else IntegratedDemonlist::loadTSL(std::move(m_aredlListener), std::move(m_aredlOkListener), [this] { populateList(""); }, failure(false));
 
     return true;
 }
@@ -288,9 +288,22 @@ void IDListLayer::showLoading() {
 }
 
 void IDListLayer::populateList(const std::string& query) {
-    m_fullSearchResults = ranges::map<std::vector<std::string>>(ranges::filter(PEMONLIST ? IntegratedDemonlist::PEMONLIST : IntegratedDemonlist::AREDL,
-        [&query](const IDListDemon& level) { return query.empty() || string::contains(string::toLower(std::to_string(level.id)), string::toLower(query)); }),
-        [](const IDListDemon& level) { return std::to_string(level.id); });
+    const auto& source = PEMONLIST ? IntegratedDemonlist::PEMONLIST : IntegratedDemonlist::AREDL;
+
+    // Do the filtering manually instead of using ranges
+    std::vector<std::string> results;
+    results.reserve(source.size());  // Preallocate for efficiency
+
+    for (const auto& level : source) {
+        if (query.empty() || string::contains(
+            string::toLower(std::to_string(level.id)),
+            string::toLower(query)))
+        {
+            results.push_back(std::to_string(level.id));
+        }
+    }
+
+    m_fullSearchResults = std::move(results);
 
     m_query = query;
 
@@ -303,7 +316,8 @@ void IDListLayer::populateList(const std::string& query) {
         glm->m_levelManagerDelegate = this;
         auto searchResults = std::vector<std::string>(m_fullSearchResults.begin() + m_page * 10,
             m_fullSearchResults.begin() + std::min((int)m_fullSearchResults.size(), (m_page + 1) * 10));
-        auto searchObject = GJSearchObject::create(SearchType::MapPackOnClick, string::join(searchResults, ","));
+        log::info("Searching for levels: {}", string::join(searchResults, ","));
+        auto searchObject = GJSearchObject::create(SearchType::Type26, string::join(searchResults, ","));
         std::string key = searchObject->getKey();
         if (auto storedLevels = glm->getStoredOnlineLevels(key.substr(std::max(0, (int)key.size() - 256)).c_str())) {
             loadLevelsFinished(storedLevels, key.c_str());
@@ -317,7 +331,7 @@ void IDListLayer::loadLevelsFinished(CCArray* levels, const char*) {
     auto winSize = CCDirector::get()->getWinSize();
     if (m_list->getParent() == this) removeChild(m_list);
     m_list = GJListLayer::create(CustomListView::create(levels, BoomListType::Level, 190.0f, 356.0f),
-        PEMONLIST ? "Pemonlist" : "All Rated Extreme Demons List", { 0, 0, 0, 180 }, 356.0f, 220.0f, 0);
+        PEMONLIST ? "TSL+" : "TSL", { 0, 0, 0, 180 }, 356.0f, 220.0f, 0);
     m_list->setZOrder(2);
     m_list->setPosition(winSize / 2 - m_list->getContentSize() / 2);
     m_list->setID("GJListLayer");
@@ -353,11 +367,11 @@ void IDListLayer::setupPageInfo(gd::string, const char*) {
 void IDListLayer::search() {
     if (m_query != m_searchBarText) {
         showLoading();
-        if (PEMONLIST) IntegratedDemonlist::loadPemonlist(std::move(m_pemonlistListener), std::move(m_pemonlistOkListener), [this] {
+        if (PEMONLIST) IntegratedDemonlist::loadTSLPlus(std::move(m_pemonlistListener), std::move(m_pemonlistOkListener), [this] {
             m_page = 0;
             populateList(m_searchBarText);
         }, failure(true));
-        else IntegratedDemonlist::loadAREDL(std::move(m_aredlListener), std::move(m_aredlOkListener), [this] {
+        else IntegratedDemonlist::loadTSL(std::move(m_aredlListener), std::move(m_aredlOkListener), [this] {
             m_page = 0;
             populateList(m_searchBarText);
         }, failure(false));

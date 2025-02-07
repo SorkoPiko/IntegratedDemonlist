@@ -1,15 +1,12 @@
-# Integrated Demonlist
-A mod that integrates [aredl.net](https://aredl.net) and [pemonlist.com](https://pemonlist.com) into Geometry Dash.
+# Integrated TSL
+A mod that integrates TSL and TSL+ into Geometry Dash.
 
 # Features
 - A new button in the level search screen that opens the demon list
 - A search box that allows you to search for a demon in the list by name
 - Page navigation buttons that allow you to navigate through the list
-- Buttons that allow you to switch between the AREDL (For classic demons) and the Pemonlist (For platformer demons)
-- A button in the map pack menu that opens the AREDL pack list
+- Buttons that allow you to switch between the TSL and the TSL+
 - Text on a demon's search box that states its position on the list (If on the list and the text is enabled in the mod settings)
 
-# Gallery
-![AREDL](hiimjustin000.integrated_demonlist/aredl.png?width=320)\
-![Pemonlist](hiimjustin000.integrated_demonlist/pemonlist.png?width=320)\
-![AREDL Packs](hiimjustin000.integrated_demonlist/aredl-packs.png?width=320)
+# Special Thanks
+- [Jasmine](https://github.com/hiimjasmine00) for the original mod code (Integrated Demonlist)

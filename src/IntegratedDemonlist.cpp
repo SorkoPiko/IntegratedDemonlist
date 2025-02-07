@@ -1,125 +1,164 @@
 #include "IntegratedDemonlist.hpp"
 #include <Geode/utils/ranges.hpp>
+#include <queue>
 
 using namespace geode::prelude;
 
-#define AREDL_URL "https://api.aredl.net/api/aredl/levels"
-#define AREDL_PACKS_URL "https://api.aredl.net/api/aredl/packs"
-#define PEMONLIST_UPTIME_URL "https://pemonlist.com/api/uptime?version=2"
-#define PEMONLIST_URL "https://pemonlist.com/api/list?limit=150&version=2"
+#define TSL_BASE_URL "https://tsl.pages.dev/data"
+#define TSL_PLUS_BASE_URL "https://tslplus.pages.dev/data"
 
-void isOk(const std::string& url, EventListener<web::WebTask>&& listenerRef, bool head, const std::function<void(bool, int)>& callback) {
+void isOk(const std::string& url, EventListener<web::WebTask>&& listenerRef, const bool head, const std::function<void(bool, int)>& callback) {
     auto&& listener = std::move(listenerRef);
     listener.bind([callback](web::WebTask::Event* e) {
-        if (auto res = e->getValue()) callback(res->ok(), res->code());
+        if (const auto res = e->getValue()) callback(res->ok(), res->code());
     });
     listenerRef.setFilter(head ? web::WebRequest().send("HEAD", url) : web::WebRequest().downloadRange({ 0, 0 }).get(url));
 }
 
-void IntegratedDemonlist::loadAREDL(
-    EventListener<web::WebTask>&& listenerRef, EventListener<web::WebTask>&& okListener,
-    const std::function<void()>& success, const std::function<void(int)>& failure
+static std::mutex g_resultsMutex;
+
+struct LoadState {
+    std::atomic<size_t> pendingRequests = 0;
+    std::vector<IDListDemon> results;
+    std::vector<std::unique_ptr<EventListener<web::WebTask>>> listeners;
+    std::function<void()> successCallback;
+};
+
+void IntegratedDemonlist::load(
+    const std::string& url,
+    bool pemonlist,
+    EventListener<web::WebTask>&& listenerRef,
+    EventListener<web::WebTask>&& okListener,
+    const std::function<void()>& success,
+    const std::function<void(int)>& failure
 ) {
-    auto&& listener = std::move(listenerRef);
-    listener.bind([failure, success](web::WebTask::Event* e) {
-        if (auto res = e->getValue()) {
+    auto state = std::make_shared<LoadState>();
+    state->successCallback = success;
+
+    auto&& mainListener = std::move(listenerRef);
+
+    // Handler for individual level data requests
+    auto handleLevelData = [state, pemonlist](web::WebTask::Event* e, size_t position) {
+        if (const auto res = e->getValue()) {
+            if (res->ok()) {
+                auto json = res->json().unwrapOr(matjson::Value());
+                if (json.contains("id") && json.contains("name")) {
+                    // Lock mutex when modifying shared data
+                    std::lock_guard lock(g_resultsMutex);
+                    state->results.push_back(IDListDemon{
+                        static_cast<int>(json["id"].asInt().unwrap()),
+                        json["name"].asString().unwrap(),
+                        static_cast<int>(position + 1)  // 1-based position
+                    });
+                }
+            }
+
+            // Atomically decrease pending requests
+            if (--state->pendingRequests == 0) {
+                std::lock_guard lock(g_resultsMutex);
+
+                std::vector<IDListDemon> sortedResults = state->results;
+
+                std::ranges::sort(sortedResults,
+                    [](const IDListDemon& a, const IDListDemon& b) {
+                        return a.position < b.position;
+                    });
+
+                if (pemonlist) {
+                    PEMONLIST = std::move(sortedResults);
+                    PEMONLIST_LOADED = true;
+                } else {
+                    AREDL = std::move(sortedResults);
+                    AREDL_LOADED = true;
+                }
+
+                // Call success callback after data is safely copied
+                if (state->successCallback) {
+                    state->successCallback();
+                }
+            }
+        }
+    };
+
+    // Main listener for the list file
+    mainListener.bind([state, url, pemonlist, handleLevelData, failure](web::WebTask::Event* e) {
+        if (const auto res = e->getValue()) {
             if (!res->ok()) return failure(res->code());
 
-            AREDL_LOADED = true;
-            AREDL.clear();
             auto json = res->json().unwrapOr(matjson::Value());
-            if (!json.isArray()) return success();
+            if (!json.isArray()) return failure(400);
 
-            AREDL = ranges::map<std::vector<IDListDemon>>(ranges::filter(json.asArray().unwrap(), [](const matjson::Value& level) {
-                return (!level.contains("legacy") || !level["legacy"].isBool() || !level["legacy"].asBool().unwrap()) &&
-                    level.contains("level_id") && level["level_id"].isNumber() &&
-                    level.contains("name") && level["name"].isString() &&
-                    level.contains("position") && level["position"].isNumber();
-            }), [](const matjson::Value& level) {
-                return IDListDemon {
-                    (int)level["level_id"].asInt().unwrap(),
-                    level["name"].asString().unwrap(),
-                    (int)level["position"].asInt().unwrap()
-                };
-            });
-            success();
+            {
+                // Lock mutex when clearing data
+                std::lock_guard lock(g_resultsMutex);
+                state->results.clear();
+                state->listeners.clear();
+                if (pemonlist) {
+                    PEMONLIST.clear();
+                    PEMONLIST_LOADED = false;
+                } else {
+                    AREDL.clear();
+                    AREDL_LOADED = false;
+                }
+            }
+
+            const auto& levelNames = json.asArray().unwrap();
+            state->pendingRequests = 0;  // Reset counter before counting valid entries
+
+            for (size_t i = 0; i < levelNames.size(); ++i) {
+                if (!levelNames[i].isString()) {
+                    continue;
+                }
+
+                ++state->pendingRequests;  // Increment atomically for valid entries
+                std::string levelName = levelNames[i].asString().unwrap();
+                std::string levelUrl = fmt::format("{}/{}.json", url, levelName);
+
+                auto listener = std::make_unique<EventListener<web::WebTask>>();
+
+                // Bind the listener
+                listener->bind([handleLevelData, i](web::WebTask::Event* e) {
+                    handleLevelData(e, i);
+                });
+
+                // Start the request
+                listener->setFilter(web::WebRequest().get(levelUrl));
+                state->listeners.push_back(std::move(listener));
+            }
+
+            // Handle case where no valid entries were found
+            if (state->pendingRequests == 0) {
+                std::lock_guard lock(g_resultsMutex);
+                if (pemonlist) PEMONLIST_LOADED = true;
+                else AREDL_LOADED = true;
+                if (state->successCallback) {
+                    state->successCallback();
+                }
+            }
         }
     });
 
-    isOk(AREDL_URL, std::move(okListener), true, [&listener, failure](bool ok, int code) {
-        if (ok) listener.setFilter(web::WebRequest().get(AREDL_URL));
+    const auto listURL = fmt::format("{}/_list.json", url);
+    isOk(listURL, std::move(okListener), true, [&mainListener, failure, listURL](bool ok, int code) {
+        if (ok) mainListener.setFilter(web::WebRequest().get(listURL));
         else failure(code);
     });
 }
 
-void IntegratedDemonlist::loadAREDLPacks(
-    EventListener<web::WebTask>&& listenerRef, EventListener<web::WebTask>&& okListener,
-    const std::function<void()>& success, const std::function<void(int)>& failure
+void IntegratedDemonlist::loadTSL(
+    EventListener<web::WebTask>&& listenerRef,
+    EventListener<web::WebTask>&& okListener,
+    const std::function<void()>& success,
+    const std::function<void(int)>& failure
 ) {
-    auto&& listener = std::move(listenerRef);
-    listener.bind([failure, success](web::WebTask::Event* e) {
-        if (auto res = e->getValue()) {
-            if (!res->ok()) return failure(res->code());
-
-            AREDL_PACKS.clear();
-            auto json = res->json().unwrapOr(matjson::Value());
-            if (!json.isArray()) return success();
-
-            AREDL_PACKS = ranges::map<std::vector<IDDemonPack>>(ranges::filter(json.asArray().unwrap(), [](const matjson::Value& pack) {
-                return pack.contains("name") && pack["name"].isString() &&
-                    pack.contains("points") && pack["points"].isNumber() &&
-                    pack.contains("levels") && pack["levels"].isArray();
-            }), [](const matjson::Value& pack) {
-                return IDDemonPack {
-                    pack["name"].asString().unwrap(),
-                    pack["points"].asDouble().unwrap(),
-                    ranges::map<std::vector<int>>(ranges::filter(pack["levels"].asArray().unwrap(), [](const matjson::Value& level) {
-                        return level.contains("level_id") && level["level_id"].isNumber();
-                    }), [](const matjson::Value& level) { return level["level_id"].asInt().unwrap(); })
-                };
-            });
-            std::sort(AREDL_PACKS.begin(), AREDL_PACKS.end(), [](const IDDemonPack& a, const IDDemonPack& b) { return a.points < b.points; });
-            success();
-        }
-    });
-
-    isOk(AREDL_PACKS_URL, std::move(okListener), true, [&listener, failure](bool ok, int code) {
-        if (ok) listener.setFilter(web::WebRequest().get(AREDL_PACKS_URL));
-        else failure(code);
-    });
+    load(TSL_BASE_URL, false, std::move(listenerRef), std::move(okListener), success, failure);
 }
 
-void IntegratedDemonlist::loadPemonlist(
-    EventListener<web::WebTask>&& listenerRef, EventListener<web::WebTask>&& okListener,
-    const std::function<void()>& success, const std::function<void(int)>& failure
+void IntegratedDemonlist::loadTSLPlus(
+    EventListener<web::WebTask>&& listenerRef,
+    EventListener<web::WebTask>&& okListener,
+    const std::function<void()>& success,
+    const std::function<void(int)>& failure
 ) {
-    auto&& listener = std::move(listenerRef);
-    listener.bind([failure, success](web::WebTask::Event* e) {
-        if (auto res = e->getValue()) {
-            if (!res->ok()) return failure(res->code());
-
-            PEMONLIST_LOADED = true;
-            PEMONLIST.clear();
-            auto json = res->json().unwrapOr(matjson::Value());
-            if (!json.isObject() || !json.contains("data") || !json["data"].isArray()) return success();
-
-            PEMONLIST = ranges::map<std::vector<IDListDemon>>(ranges::filter(json["data"].asArray().unwrap(), [](const matjson::Value& level) {
-                return level.contains("level_id") && level["level_id"].isNumber() &&
-                    level.contains("name") && level["name"].isString() &&
-                    level.contains("placement") && level["placement"].isNumber();
-            }), [](const matjson::Value& level) {
-                return IDListDemon {
-                    (int)level["level_id"].asInt().unwrap(),
-                    level["name"].asString().unwrap(),
-                    (int)level["placement"].asInt().unwrap()
-                };
-            });
-            success();
-        }
-    });
-
-    isOk(PEMONLIST_UPTIME_URL, std::move(okListener), false, [&listener, failure](bool ok, int code) {
-        if (ok) listener.setFilter(web::WebRequest().get(PEMONLIST_URL));
-        else failure(code);
-    });
+    load(TSL_PLUS_BASE_URL, true, std::move(listenerRef), std::move(okListener), success, failure);
 }
